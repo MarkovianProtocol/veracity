@@ -189,6 +189,38 @@ veracity --data-url $DATATRAILS_URL/verifiabledata \
 
 The above command will output `c3323019fd1d325ac068d203c62007b504c5fa762446a9fe5d88e392ec96914b` which will match the value from the merkle log entry page.
 
+## Anchoring The Accumulator To Bitcoin
+
+A MERKLE_LOG seal signs the accumulator under the operator's key. It says who
+vouched for that log state; it does not say when the state existed, against a
+clock the operator does not run. An OpenTimestamps proof over the same bytes
+adds that, with a trust root nobody runs.
+
+`accumulator-root` prints the digest a checkpoint receipt signs - sha256 over
+`massifs.DetachedPayload`, the peaks concatenated in accumulator order, which is
+also what the univocity contract verifies - and with `--ots` checks a proof over
+it:
+
+```
+veracity accumulator-root --peaks peaks.hex
+peaks: 3
+accumulator root: 0a3f00d3ffdbf0d2d8900814e5463931b951231289e2f9be38c0ad1fc9a99d2c
+
+veracity accumulator-root --peaks peaks.hex --ots accumulator.root.ots
+anchored in bitcoin block 957403
+that block's merkle root must be ...
+```
+
+The proof is parsed and walked in `ots/`, in process, with nothing outside the
+standard library and no call to the stock `ots` client. Nothing fetches block
+headers: veracity proves the proof commits to this accumulator and no other, and
+names the block and the Merkle root that block must have. Comparing that root
+with a header you trust is the step you keep.
+
+What this gives you is existence and ordering in time. Not consistency, not
+append-only, not inclusion. It sits beside the seal rather than replacing it.
+`examples/bitcoin-anchor.sh` runs the whole loop, stamping with the stock client.
+
 ## General Use Commands
 
 Additional Commands include:
@@ -198,6 +230,7 @@ Additional Commands include:
 * `watch` - discover recently active logs
 * `replicate-logs` - create or update a local trusted replica of one more more tenants logs,
    accepts the output of `watch` as input.
+* `accumulator-root` - print the accumulator root a checkpoint receipt signs, and check an OpenTimestamps anchor over it
 * `receipt` - Generate a [COSE Receipt](https://www.ietf.org/archive/id/draft-ietf-cose-merkle-tree-proofs-07.html) of inclusion using the [MMRIVER profile](https://www.ietf.org/archive/id/draft-bryce-cose-merkle-mountain-range-proofs-00.html) for an entry.
 
 For more information, please visit the [DataTrails documentation](https://docs.datatrails.ai/)
