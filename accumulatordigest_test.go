@@ -19,9 +19,9 @@ var kat39Peaks = []string{
 	"e9a5f5201eb3c3c856e0a224527af5ac7eb1767fb1aff9bd53ba41a60cde9785",
 }
 
-// The root is sha256 over the three peaks concatenated, nothing else. Recomputed
+// The digest is sha256 over the three peaks concatenated, nothing else. Recomputed
 // by hand from the KAT hashes above: 0a3f00d3...
-const kat39Root = "0a3f00d3ffdbf0d2d8900814e5463931b951231289e2f9be38c0ad1fc9a99d2c"
+const kat39Digest = "0a3f00d3ffdbf0d2d8900814e5463931b951231289e2f9be38c0ad1fc9a99d2c"
 
 func peaksFromHex(t *testing.T, in []string) [][]byte {
 	t.Helper()
@@ -34,18 +34,18 @@ func peaksFromHex(t *testing.T, in []string) [][]byte {
 	return out
 }
 
-// TestAccumulatorRootKAT39 pins the root to the draft's own MMR(39) vector.
-func TestAccumulatorRootKAT39(t *testing.T) {
-	root := accumulatorRoot(peaksFromHex(t, kat39Peaks))
-	assert.Equal(t, kat39Root, hex.EncodeToString(root[:]))
+// TestAccumulatorDigestKAT39 pins the digest to the draft's own MMR(39) vector.
+func TestAccumulatorDigestKAT39(t *testing.T) {
+	digest := accumulatorDigest(peaksFromHex(t, kat39Peaks))
+	assert.Equal(t, kat39Digest, hex.EncodeToString(digest[:]))
 }
 
-// TestAccumulatorRootOrderMatters shows the root is over the peaks in accumulator
-// order: reordering them is a different log state and must not produce the same root.
-func TestAccumulatorRootOrderMatters(t *testing.T) {
+// TestAccumulatorDigestOrderMatters shows the digest is over the peaks in accumulator
+// order: reordering them is a different log state and must not produce the same digest.
+func TestAccumulatorDigestOrderMatters(t *testing.T) {
 	peaks := peaksFromHex(t, kat39Peaks)
 	swapped := [][]byte{peaks[1], peaks[0], peaks[2]}
-	assert.NotEqual(t, accumulatorRoot(peaks), accumulatorRoot(swapped))
+	assert.NotEqual(t, accumulatorDigest(peaks), accumulatorDigest(swapped))
 }
 
 func TestParsePeaksHex(t *testing.T) {
@@ -53,8 +53,8 @@ func TestParsePeaksHex(t *testing.T) {
 	peaks, err := parsePeaksHex(bufio.NewScanner(strings.NewReader(in)))
 	require.NoError(t, err)
 	require.Len(t, peaks, 3)
-	root := accumulatorRoot(peaks)
-	assert.Equal(t, kat39Root, hex.EncodeToString(root[:]))
+	digest := accumulatorDigest(peaks)
+	assert.Equal(t, kat39Digest, hex.EncodeToString(digest[:]))
 }
 
 func TestParsePeaksHexRejectsGarbage(t *testing.T) {
@@ -71,20 +71,20 @@ func TestCheckAnchorRejectsForeignProof(t *testing.T) {
 	if err != nil {
 		t.Skip("no testdata/foreign.ots")
 	}
-	root := accumulatorRoot(peaksFromHex(t, kat39Peaks))
-	_, err = checkAnchor(root[:], proof)
+	digest := accumulatorDigest(peaksFromHex(t, kat39Peaks))
+	_, err = checkAnchor(digest[:], proof)
 	assert.Error(t, err)
 }
 
 // TestCheckAnchorKAT39 is the positive case: the proof over the MMR(39)
-// accumulator root, anchored in a Bitcoin block.
+// accumulator digest, anchored in a Bitcoin block.
 func TestCheckAnchorKAT39(t *testing.T) {
 	proof, err := os.ReadFile("testdata/kat39.ots")
 	if err != nil {
 		t.Skip("no testdata/kat39.ots")
 	}
-	root := accumulatorRoot(peaksFromHex(t, kat39Peaks))
-	b, err := checkAnchor(root[:], proof)
+	digest := accumulatorDigest(peaksFromHex(t, kat39Peaks))
+	b, err := checkAnchor(digest[:], proof)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(957403), b.Height)
 	assert.Len(t, b.MerkleRoot, 32)

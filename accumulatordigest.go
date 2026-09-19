@@ -15,15 +15,18 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-// The accumulator root is sha256 over the COSE detached payload the checkpoint
-// receipt signs: massifs.DetachedPayload, the raw concatenation of the
-// accumulator peaks in descending height order. It is not the bagged mono-root
-// from mmr.HashPeaksRHS, which is a different value for the same log state.
-// Anchoring this one means the OpenTimestamps proof, the operator's seal and
-// the univocity contract all commit to the same bytes.
+// This file exists to interoperate with OpenTimestamps, and with anchoring
+// services such as Markovian Protocol's that commit to one hash per log state.
+// The accumulator itself needs no single hash. An OpenTimestamps proof commits
+// to one, so the digest here is sha256 over the COSE detached payload the
+// checkpoint receipt signs: massifs.DetachedPayload, the raw concatenation of
+// the accumulator peaks in descending height order. Stamping that payload means
+// the OpenTimestamps proof, the operator's seal and the univocity contract all
+// commit to the same bytes.
 
-// accumulatorRoot returns the digest an anchor commits to for a peak set.
-func accumulatorRoot(peaks [][]byte) [32]byte {
+// accumulatorDigest returns the sha256 an OpenTimestamps proof commits to for a
+// peak set.
+func accumulatorDigest(peaks [][]byte) [32]byte {
 	return sha256.Sum256(massifs.DetachedPayload(peaks))
 }
 
@@ -51,11 +54,11 @@ func parsePeaksHex(r *bufio.Scanner) ([][]byte, error) {
 	return peaks, nil
 }
 
-// checkAnchor verifies an OpenTimestamps proof commits to root and reports the
+// checkAnchor verifies an OpenTimestamps proof commits to digest and reports the
 // Bitcoin block it is anchored in. It does no network I/O: comparing the
 // returned Merkle root with a block header is the caller's step.
-func checkAnchor(root []byte, proof []byte) (ots.Attestation, error) {
-	p, err := ots.Verify(proof, root)
+func checkAnchor(digest []byte, proof []byte) (ots.Attestation, error) {
+	p, err := ots.Verify(proof, digest)
 	if err != nil {
 		return ots.Attestation{}, err
 	}
@@ -72,16 +75,20 @@ func checkAnchor(root []byte, proof []byte) (ots.Attestation, error) {
 	return b, nil
 }
 
-func NewAccumulatorRootCmd() *cli.Command {
+func NewAccumulatorOTSHashCmd() *cli.Command {
 	return &cli.Command{
-		Name:  "accumulator-root",
-		Usage: "Print the accumulator root a checkpoint receipt signs, and optionally check an OpenTimestamps anchor over it",
-		Description: `The accumulator root is sha256 over the detached payload of the accumulator
-peaks - the same bytes massifs.DetachedPayload produces and the univocity
-contract verifies. With --ots it reads an OpenTimestamps proof, checks in
-process that the proof commits to exactly that root, and prints the Bitcoin
-block and the Merkle root that block must have. It fetches no block headers:
-existence and ordering against the chain, not consistency or append-only.`,
+		Name:  "accumulator-ots-hash",
+		Usage: "Print the sha256 an OpenTimestamps proof commits to for an accumulator, and optionally check a proof over it",
+		Description: `For interoperating with OpenTimestamps, and with anchoring services such as
+Markovian Protocol's. The accumulator needs no single hash; an OpenTimestamps
+proof commits to one. This prints sha256 over the detached payload of the
+accumulator peaks - the same bytes massifs.DetachedPayload produces and the
+univocity contract verifies. Stamping that payload with the stock ots client
+gives a proof over this digest. With --ots it reads an OpenTimestamps proof,
+checks in process that the proof commits to exactly this digest, and prints the
+Bitcoin block and the Merkle root that block must have. It fetches no block
+headers: existence and ordering against the chain, not consistency or
+append-only.`,
 		Flags: []cli.Flag{
 			&cli.Int64Flag{
 				Name: "mmrindex", Aliases: []string{"i"},
@@ -93,7 +100,7 @@ existence and ordering against the chain, not consistency or append-only.`,
 			},
 			&cli.StringFlag{
 				Name:  "ots",
-				Usage: "check the OpenTimestamps proof in `FILE` commits to the root",
+				Usage: "check the OpenTimestamps proof in `FILE` commits to the digest",
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -139,9 +146,9 @@ existence and ordering against the chain, not consistency or append-only.`,
 				}
 			}
 
-			root := accumulatorRoot(peaks)
+			digest := accumulatorDigest(peaks)
 			fmt.Printf("peaks: %d\n", len(peaks))
-			fmt.Printf("accumulator root: %x\n", root)
+			fmt.Printf("accumulator digest: %x\n", digest)
 
 			otsFile := cCtx.String("ots")
 			if otsFile == "" {
@@ -151,7 +158,7 @@ existence and ordering against the chain, not consistency or append-only.`,
 			if err != nil {
 				return err
 			}
-			b, err := checkAnchor(root[:], proof)
+			b, err := checkAnchor(digest[:], proof)
 			if err != nil {
 				return fmt.Errorf("anchor: %w", err)
 			}
