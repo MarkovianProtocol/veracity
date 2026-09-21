@@ -209,8 +209,8 @@ peaks: 3
 accumulator digest: 0a3f00d3ffdbf0d2d8900814e5463931b951231289e2f9be38c0ad1fc9a99d2c
 
 veracity accumulator-ots-hash --peaks peaks.hex --ots accumulator.payload.ots
-anchored in bitcoin block <height>
-that block's merkle root must be <merkle root>
+anchored in bitcoin block 967645
+that block's merkle root must be 8a2c774a122eb8a87ba58d22bf4ec3a57bc0ac6c29a80e3e4eee039772c7b3a1
 ```
 
 The proof is parsed and walked in `ots/`, in process, with nothing outside the

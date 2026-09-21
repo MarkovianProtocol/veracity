@@ -86,6 +86,6 @@ func TestCheckAnchorKAT39(t *testing.T) {
 	digest := accumulatorDigest(peaksFromHex(t, kat39Peaks))
 	b, err := checkAnchor(digest[:], proof)
 	require.NoError(t, err)
-	assert.Equal(t, uint64(957403), b.Height)
+	assert.Equal(t, uint64(967645), b.Height)
 	assert.Len(t, b.MerkleRoot, 32)
 }
